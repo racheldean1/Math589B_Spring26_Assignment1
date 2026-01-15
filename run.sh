@@ -1,3 +1,4 @@
+# Gist: execute these commands to run the optimization code
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
