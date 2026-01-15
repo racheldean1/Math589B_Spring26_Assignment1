@@ -73,6 +73,63 @@ and for Coulomb:
 \]
 \end{itemize}
 
+
+\section{Self-avoidance via segment--segment WCA interaction}
+
+Point--point repulsion is insufficient to prevent self-intersection of a discretized filament.
+Instead, we model \emph{self-avoidance} via short-range repulsion between \emph{segments} of the polyline.
+
+Let the $i$-th segment be
+\[
+\mathbf{p}_i(u) = \mathbf{x}_i + u(\mathbf{x}_{i+1}-\mathbf{x}_i), \qquad u\in[0,1],
+\]
+and similarly
+\[
+\mathbf{p}_j(v) = \mathbf{x}_j + v(\mathbf{x}_{j+1}-\mathbf{x}_j), \qquad v\in[0,1].
+\]
+
+Define the squared distance function
+\[
+\phi(u,v) = \|\mathbf{p}_i(u) - \mathbf{p}_j(v)\|^2.
+\]
+The segment--segment distance is
+\[
+d_{ij} = \min_{u,v\in[0,1]} \|\mathbf{p}_i(u)-\mathbf{p}_j(v)\| = \sqrt{\phi(u^\*,v^\*)},
+\]
+where $(u^\*,v^\*)$ satisfies the first-order conditions
+\[
+\partial_u\phi(u,v)=0,\qquad \partial_v\phi(u,v)=0,
+\]
+together with the box constraints $u,v\in[0,1]$.
+
+\subsection{Weeks--Chandler--Andersen (WCA) potential}
+We use the repulsive part of the Lennard--Jones potential:
+\[
+U(d)=
+\begin{cases}
+4\varepsilon\Bigl[(\sigma/d)^{12}-(\sigma/d)^6\Bigr]+\varepsilon,
+& d < 2^{1/6}\sigma,\\
+0, & d\ge 2^{1/6}\sigma.
+\end{cases}
+\]
+Define the self-avoidance energy
+\[
+E_{\mathrm{sa}}=\sum_{(i,j)\in\mathcal{P}} U(d_{ij}),
+\]
+where $\mathcal{P}$ ranges over \emph{non-adjacent} segment pairs (exclude $(i,i+1)$ with $(i\pm 1,i\pm 2)$ and the wrap neighbors).
+
+\subsection{Gradient requirement}
+You must compute $\nabla E_{\mathrm{sa}}$ with respect to all node positions $\mathbf{x}_k$.
+This requires differentiating through the closest-point problem: the minimizers $(u^\*,v^\*)$ depend implicitly
+on the segment endpoints $(\mathbf{x}_i,\mathbf{x}_{i+1},\mathbf{x}_j,\mathbf{x}_{j+1})$.
+
+\section{Confinement potential (to induce supercoiling-like states)}
+To obtain nontrivial equilibria (coiling/packing) with purely repulsive self-avoidance, we add a weak confining potential
+\[
+E_{\mathrm{conf}} = k_c \sum_{i=0}^{N-1} \|\mathbf{x}_i\|^2,
+\]
+with $k_c>0$ small. This encourages the filament to pack into a bounded region while self-avoidance prevents self-intersection.
+
 \section{BFGS task}
 You will implement BFGS in Python to minimize $f(x)$ where $x\in\mathbb{R}^{3N}$ is the flattened coordinate vector.
 At iteration $k$:
