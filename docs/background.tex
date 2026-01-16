@@ -94,9 +94,9 @@ Define the squared distance function
 \]
 The segment--segment distance is
 \[
-d_{ij} = \min_{u,v\in[0,1]} \|\mathbf{p}_i(u)-\mathbf{p}_j(v)\| = \sqrt{\phi(u^\*,v^\*)},
+d_{ij} = \min_{u,v\in[0,1]} \|\mathbf{p}_i(u)-\mathbf{p}_j(v)\| = \sqrt{\phi(u^*,v^*)},
 \]
-where $(u^\*,v^\*)$ satisfies the first-order conditions
+where $(u^*,v^*)$ satisfies the first-order conditions
 \[
 \partial_u\phi(u,v)=0,\qquad \partial_v\phi(u,v)=0,
 \]
@@ -120,7 +120,7 @@ where $\mathcal{P}$ ranges over \emph{non-adjacent} segment pairs (exclude $(i,i
 
 \subsection{Gradient requirement}
 You must compute $\nabla E_{\mathrm{sa}}$ with respect to all node positions $\mathbf{x}_k$.
-This requires differentiating through the closest-point problem: the minimizers $(u^\*,v^\*)$ depend implicitly
+This requires differentiating through the closest-point problem: the minimizers $(u^*,v^*)$ depend implicitly
 on the segment endpoints $(\mathbf{x}_i,\mathbf{x}_{i+1},\mathbf{x}_j,\mathbf{x}_{j+1})$.
 
 \section{Confinement potential (to induce supercoiling-like states)}
