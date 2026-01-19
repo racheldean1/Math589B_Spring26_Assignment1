@@ -38,6 +38,10 @@ def main():
 
     X = unpack(res.x)
 
+    # Close the filament
+    X = np.vstack([X, X[0,]])
+
+
     plt.figure()
     plt.plot(res.history["f"])
     plt.xlabel("iteration")
