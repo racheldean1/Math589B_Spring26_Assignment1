@@ -1,13 +1,9 @@
 from __future__ import annotations
-
+import numpy as np
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Tuple
 
-import numpy as np
-
-# Type alias: function returns (f, g)
 ValueGrad = Callable[[np.ndarray], Tuple[float, np.ndarray]]
-
 
 @dataclass
 class BFGSResult:
@@ -32,13 +28,11 @@ def backtracking_line_search(
     max_steps: int = 25,
 ) -> Tuple[float, float, np.ndarray, int]:
     """
-    Backtracking line search with Armijo condition.
-
-    TODO (students): implement Armijo condition and backtracking.
-    Armijo: f(x + a p) <= f(x) + c1 a g^T p
-    We assume p is a descent direction (usually p = -H @ g).
-    Armijo condition: f(x + a p) <= f(x) + c1 * a * g^T p
+    Simple Armijo backtracking line search.
+    Returns (alpha, f_new, g_new, n_feval_increment).
     """
+    # TODO (students): implement Armijo condition and backtracking.
+    # Armijo: f(x + a p) <= f(x) + c1 a g^T p
     alpha = float(alpha0)
     gTp = float(g @ p)
 
@@ -97,10 +91,8 @@ def bfgs(
     for k in range(max_iter):
         gnorm = float(np.linalg.norm(g))
         if gnorm < tol:
-            return BFGSResult(
-                x=x, f=float(f), g=g, n_iter=k, n_feval=n_feval,
-                converged=True, history=hist
-            )
+            return BFGSResult(x=x, f=float(f), g=g, n_iter=k, n_feval=n_feval,
+                              converged=True, history=hist)
 
         # Search direction
         p = -H @ g
@@ -168,7 +160,5 @@ def bfgs(
         hist["f"].append(float(f))
         hist["gnorm"].append(float(np.linalg.norm(g)))
 
-    return BFGSResult(
-        x=x, f=float(f), g=g, n_iter=max_iter, n_feval=n_feval,
-        converged=False, history=hist
-    )
+    return BFGSResult(x=x, f=float(f), g=g, n_iter=max_iter, n_feval=n_feval,
+                      converged=False, history=hist)
