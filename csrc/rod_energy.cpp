@@ -177,8 +177,9 @@ void rod_energy_grad(
             int jp1 = j + 1;
 
             // Exclusions: skip adjacent segments (including wrap neighbors).
-            int di = (j - i + N) % N; // skipping neighbours
-            if (di == 0 || di == 1 || di == N-1) continue;
+            int di = (j - i + N) % N;
+            if (di <= 2 || di >= N-2) continue;
+
 
             double a0[3] = { get(i,0),   get(i,1),   get(i,2)   }; // endpoints of [i, i+1]
             double a1[3] = { get(ip1,0), get(ip1,1), get(ip1,2) };
