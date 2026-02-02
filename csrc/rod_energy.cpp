@@ -91,12 +91,6 @@ void rod_energy_grad(
     //
     // IMPORTANT: You must include the dependence of (u*, v*) on endpoints in your gradient.
 
-    auto clamp01 = [](double t) {
-        if (t < 0.0) return 0.0;
-        if (t > 1.0) return 1.0;
-        return t;
-    };
-
     auto dot3 = [](const double a[3], const double b[3]) {
         return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
     };
@@ -131,7 +125,7 @@ void rod_energy_grad(
         if (a <= EPS) {
             u = 0.0;
             v = (e > EPS) ? (f / e) : 0.0;
-            v = clamp01(v);
+            v = std::clamp(val, 0.0, 1.0);
             return;
         }
 
@@ -140,7 +134,7 @@ void rod_energy_grad(
         // second segment degenerates into a point
         if (e <= EPS) {
             v = 0.0;
-            u = clamp01(-c / a);
+            u = std::clamp(-c / a, 0.0, 1.0);
             return;
         }
 
@@ -186,8 +180,8 @@ void rod_energy_grad(
         u = (std::abs(uD) > EPS) ? (uN / uD) : 0.0;
         v = (std::abs(vD) > EPS) ? (vN / vD) : 0.0;
 
-        u = clamp01(u);
-        v = clamp01(v);
+        u = std::clamp(u, 0.0, 1.0);
+        v = std::clamp(v, 0.0, 1.0);
     };
 
     // Only run WCA if parameters are active
