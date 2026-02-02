@@ -108,14 +108,21 @@ def bfgs(
         # Line search
         # TODO (students): call your line search to get alpha, f_new, g_new.
         # alpha, f_new, g_new, inc = backtracking_line_search(...)
+        gnorm = float(np.linalg.norm(g))
+        alpha_start = float(min(alpha0, 1.0 / max(1.0, gnorm)))
+
         alpha, f_new, g_new, inc = backtracking_line_search(
             f_and_g=f_and_g,
             x=x,
             f=float(f),
             g=g,
             p=p,
-            alpha0=float(alpha0),
+            alpha0=alpha_start,
+            c1=1e-4,
+            tau=0.5,
+            max_steps=12,
         )
+
         n_feval += int(inc)
         hist["alpha"].append(float(alpha))
 
@@ -127,21 +134,31 @@ def bfgs(
         # TODO (students): BFGS update for H with curvature check y^T s > 0.
         # Hint: Use the standard BFGS inverse-Hessian update.
 
-        ys = float(y @ s)
+        ys = float(np.dot(y, s))
 
-        # Inverse-BFGS update:
-        # H_{k+1} = (I - rho s y^T) H_k (I - rho y s^T) + rho s s^T
-        if ys > 1e-12:
+        # Curvature / finite checks
+        if (np.isfinite(ys) and ys > 1e-12
+            and np.all(np.isfinite(s)) and np.all(np.isfinite(y))):
+
             rho = 1.0 / ys
-            I = np.eye(n)
-            V = I - rho * np.outer(s, y)
-            H = V @ H @ V.T + rho * np.outer(s, s)
 
-            # keep symmetry (numerical cleanup)
-            H = 0.5 * (H + H.T)
+            # Additional stability guard: avoid extremely large rho updates
+            if rho > 1e12:
+                H = np.eye(n)
+            else:
+                I = np.eye(n)
+                V = I - rho * np.outer(s, y)
+                H = V @ H @ V.T + rho * np.outer(s, s)
+
+                # numerical symmetry cleanup
+                H = 0.5 * (H + H.T)
+
+                # optional: if H becomes non-finite, reset
+                if not np.all(np.isfinite(H)):
+                    H = np.eye(n)
         else:
-            # Reset H if needed (curvature condition failed)
             H = np.eye(n)
+
 
         # Accept iterate
         x = x_new
