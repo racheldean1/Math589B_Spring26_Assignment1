@@ -89,7 +89,21 @@ void rod_energy_grad(
         }
     }
 
+// ---- TODO: Segment–segment WCA self-avoidance ----
+//
+// For each non-adjacent segment pair (i,i+1) and (j,j+1):
+//  1) Compute closest points parameters u*, v* in [0,1]
+//  2) Compute r = p_i(u*) - p_j(v*),  d = ||r||
+//  3) If d < 2^(1/6)*sigma:
+//       U(d) = 4 eps [ (sigma/d)^12 - (sigma/d)^6 ] + eps
+//       Accumulate E += U(d)
+//       Accumulate gradient to endpoints x_i, x_{i+1}, x_j, x_{j+1}
+//
+// Exclusions: skip adjacent segments (including wrap neighbors).
+//
+// IMPORTANT: You must include the dependence of (u*, v*) on endpoints in your gradient.
 
+    
     const double rcut = std::pow(2.0, 1.0/6.0) * sigma;     // cutoff distance 
 
     // Finding closest point parameters u and v
