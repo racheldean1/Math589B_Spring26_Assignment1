@@ -171,9 +171,11 @@ void rod_energy_grad(
         for (int j = i + 1; j < N; ++j) {
             int jp1 = j + 1;
 
-            int di = (j - i + N) % N;
-            if (di <= 2 || di >= N-2) continue;
-
+            auto circ_dist = [&](int a, int b) {
+                int da = std::abs(a - b);
+                return std::min(da, N - da);
+            };
+            if (circ_dist(i, j) <= 2) continue;
 
             double a0[3] = { get(i,0),   get(i,1),   get(i,2)   };
             double a1[3] = { get(ip1,0), get(ip1,1), get(ip1,2) };
@@ -198,12 +200,11 @@ void rod_energy_grad(
             double rvec[3] = { p[0]-q[0], p[1]-q[1], p[2]-q[2] };
             double d2 = dot3(rvec, rvec);
             double d  = std::sqrt(std::max(d2, 1e-24));
-
             if (d >= rcut) continue;
 
-            // WCA energy
+            d = std::max(d, 1e-12);
             double invd = 1.0 / d;
-            if (d < 1e-8) d = 1e-8;
+
             double sr   = sigma * invd;
             double sr2  = sr * sr;
             double sr6  = sr2 * sr2 * sr2;
@@ -216,9 +217,10 @@ void rod_energy_grad(
             double dU_dd = (24.0 * eps * invd) * (-2.0 * sr12 + sr6);
 
             // dU/dr = dU/dd * r/d
-            double gdir[3] = { dU_dd * rvec[0] * invd,
-                               dU_dd * rvec[1] * invd,
-                               dU_dd * rvec[2] * invd };
+            double gdir[3] = { (2.0 * dU_dd) * rvec[0] * invd,
+                   (2.0 * dU_dd) * rvec[1] * invd,
+                   (2.0 * dU_dd) * rvec[2] * invd };
+
 
             // Distribute to endpoints with barycentric weights
             for (int dim = 0; dim < 3; ++dim) {
