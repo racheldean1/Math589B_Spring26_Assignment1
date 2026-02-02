@@ -1,9 +1,13 @@
 from __future__ import annotations
-import numpy as np
-from dataclasses import dataclass
-from typing import Callable, Tuple, Dict, Any
 
+from dataclasses import dataclass
+from typing import Callable, Dict, List, Tuple
+
+import numpy as np
+
+# Type alias: function returns (f, g)
 ValueGrad = Callable[[np.ndarray], Tuple[float, np.ndarray]]
+
 
 @dataclass
 class BFGSResult:
@@ -13,7 +17,8 @@ class BFGSResult:
     n_iter: int
     n_feval: int
     converged: bool
-    history: Dict[str, Any]
+    history: Dict[str, List[float]]
+
 
 def backtracking_line_search(
     f_and_g: ValueGrad,
@@ -24,15 +29,16 @@ def backtracking_line_search(
     alpha0: float = 1.0,
     c1: float = 1e-4,
     tau: float = 0.5,
-    max_steps: int = 30,
+    max_steps: int = 25,
 ) -> Tuple[float, float, np.ndarray, int]:
-        """
-    Simple Armijo backtracking line search.
-    Returns (alpha, f_new, g_new, n_feval_increment).
     """
-    # TODO (students): implement Armijo condition and backtracking.
-    # Armijo: f(x + a p) <= f(x) + c1 a g^T p
-    
+    Backtracking line search with Armijo condition.
+
+    TODO (students): implement Armijo condition and backtracking.
+    Armijo: f(x + a p) <= f(x) + c1 a g^T p
+    We assume p is a descent direction (usually p = -H @ g).
+    Armijo condition: f(x + a p) <= f(x) + c1 * a * g^T p
+    """
     alpha = float(alpha0)
     gTp = float(g @ p)
 
@@ -86,13 +92,15 @@ def bfgs(
     n = x.size
     H = np.eye(n)  # inverse Hessian approximation
 
-    hist = {"f": [f], "gnorm": [np.linalg.norm(g)], "alpha": []}
+    hist = {"f": [float(f)], "gnorm": [float(np.linalg.norm(g))], "alpha": []}
 
     for k in range(max_iter):
         gnorm = float(np.linalg.norm(g))
         if gnorm < tol:
-            return BFGSResult(x=x, f=f, g=g, n_iter=k, n_feval=n_feval,
-                              converged=True, history=hist)
+            return BFGSResult(
+                x=x, f=float(f), g=g, n_iter=k, n_feval=n_feval,
+                converged=True, history=hist
+            )
 
         # Search direction
         p = -H @ g
@@ -100,7 +108,6 @@ def bfgs(
         # Line search
         # TODO (students): call your line search to get alpha, f_new, g_new.
         # alpha, f_new, g_new, inc = backtracking_line_search(...)
-        
         gnorm = float(np.linalg.norm(g))
         alpha_start = float(min(alpha0, 1.0 / max(1.0, gnorm)))
 
@@ -161,5 +168,7 @@ def bfgs(
         hist["f"].append(float(f))
         hist["gnorm"].append(float(np.linalg.norm(g)))
 
-    return BFGSResult(x=x, f=f, g=g, n_iter=max_iter, n_feval=n_feval,
-                      converged=False, history=hist)
+    return BFGSResult(
+        x=x, f=float(f), g=g, n_iter=max_iter, n_feval=n_feval,
+        converged=False, history=hist
+    )
