@@ -33,28 +33,29 @@ def backtracking_line_search(
     """
     # TODO (students): implement Armijo condition and backtracking.
     # Armijo: f(x + a p) <= f(x) + c1 a g^T p
-    alpha = float(alpha0)
-    gTp = float(g @ p)
+    alpha = float(alpha0)     // initial step size guess 
+    gTp = float(g @ p)        // directional derivative
 
     n_feval_inc = 0
 
-    # fallback: if p is not descent, use steepest descent
+    # fallback: if p is not descent, fall back to steepest descent
     if gTp >= 0.0:
         p = -g
         gTp = float(g @ p)
 
-    # Keep the last evaluated (f_new, g_new) in case we never satisfy Armijo
+    # store the last values
     f_new, g_new = f, g
 
+    // start to decrease alpha 
     for _ in range(max_steps):
-        x_new = x + alpha * p
-        f_new, g_new = f_and_g(x_new)
+        x_new = x + alpha * p        # canditate for the new point 
+        f_new, g_new = f_and_g(x_new)        # evaluate
         n_feval_inc += 1
 
         if f_new <= f + c1 * alpha * gTp:
             return alpha, float(f_new), g_new, n_feval_inc
 
-        alpha *= tau
+        alpha *= tau            # shrink the step size if needed 
 
     # returning last try if loop is exited
     return alpha, float(f_new), g_new, n_feval_inc
@@ -101,8 +102,9 @@ def bfgs(
         # TODO (students): call your line search to get alpha, f_new, g_new.
         # alpha, f_new, g_new, inc = backtracking_line_search(...)
         gnorm = float(np.linalg.norm(g))
-        alpha_start = float(min(alpha0, 1.0 / max(1.0, gnorm)))
-
+        alpha_start = float(min(alpha0, 1.0 / max(1.0, gnorm)))  # ensuring we start at a smaller gradient
+        
+        # run backtracking line search : 
         alpha, f_new, g_new, inc = backtracking_line_search(
             f_and_g=f_and_g,
             x=x,
@@ -116,7 +118,7 @@ def bfgs(
         )
 
         n_feval += int(inc)
-        hist["alpha"].append(float(alpha))
+        hist["alpha"].append(float(alpha)) # record the step size that was used. 
 
         # Update step
         x_new = x + alpha * p
@@ -125,34 +127,33 @@ def bfgs(
 
         # TODO (students): BFGS update for H with curvature check y^T s > 0.
         # Hint: Use the standard BFGS inverse-Hessian update.
-
+        # Curvature check 
         ys = float(np.dot(y, s))
 
-        # Curvature / finite checks
-        if (np.isfinite(ys) and ys > 1e-12
+        if (np.isfinite(ys) and ys > 1e-12  # for updating H
             and np.all(np.isfinite(s)) and np.all(np.isfinite(y))):
 
             rho = 1.0 / ys
 
-            # Additional stability guard: avoid extremely large rho updates
+            # avoid extreme values 
             if rho > 1e12:
-                H = np.eye(n)
-            else:
+                H = np.eye(n)    #resetting Hessian approx. 
+            else:                # standard inverse BFGS update
                 I = np.eye(n)
                 V = I - rho * np.outer(s, y)
                 H = V @ H @ V.T + rho * np.outer(s, s)
 
-                # numerical symmetry cleanup
+                # force symmetry 
                 H = 0.5 * (H + H.T)
 
-                # optional: if H becomes non-finite, reset
+               # in case H is invalid
                 if not np.all(np.isfinite(H)):
                     H = np.eye(n)
-        else:
+        else:  # reset if the curvature condition fails
             H = np.eye(n)
 
 
-        # Accept iterate
+        # Accept new iteration
         x = x_new
         f = float(f_new)
         g = g_new
