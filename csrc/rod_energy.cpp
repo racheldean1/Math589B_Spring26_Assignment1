@@ -106,8 +106,10 @@ for (int i = 0; i < N; ++i) {
   int ip1 = i + 1;
   for (int j = i + 1; j < N; ++j) {
     int jp1 = j + 1;
-    int di = (j - i + N) % N; // skipping neighbours
-    if (di == 0 || di == 1 || di == N-1) continue;
+    if (j == i) continue;
+    if (j == i + 1) continue;
+    if (i == 0 && j == N - 1) continue;
+
     double a0[3] = { get(i,0),   get(i,1),   get(i,2) }; // endpoints of [i,i+1]
     double a1[3] = { get(ip1,0), get(ip1,1), get(ip1,2) };
     double b0[3] = { get(j,0),   get(j,1),   get(j,2) }; //  endpoints of [j, j+1]
