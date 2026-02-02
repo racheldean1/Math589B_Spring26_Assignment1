@@ -95,6 +95,22 @@ void rod_energy_grad(
         return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
     };
 
+    auto sub3 = [](double out[3], const double a[3], const double b[3]) {
+    out[0] = a[0] - b[0];
+    out[1] = a[1] - b[1];
+    out[2] = a[2] - b[2];
+    };
+
+    auto norm3 = [&](const double a[3]) {
+        return std::sqrt(dot3(a, a));
+    };
+
+auto lerp3 = [](double out[3], const double A[3], const double B[3], double u) {
+    out[0] = A[0] + u * (B[0] - A[0]);
+    out[1] = A[1] + u * (B[1] - A[1]);
+    out[2] = A[2] + u * (B[2] - A[2]);
+};
+
     // circular distance on a ring of N vertices
     auto circ_dist = [N](int a, int b) {
         int da = std::abs(a - b);
@@ -105,84 +121,86 @@ void rod_energy_grad(
 
     // Robust closest points on two segments in 3D.
     // Returns (u,v) in [0,1]^2 for p=a0+u*(a1-a0), q=b0+v*(b1-b0).
-    auto closest_uv = [&](const double a0[3], const double a1[3],
-                          const double b0[3], const double b1[3],
-                          double &u, double &v) {
+    auto closest_uv = [&](const double P0[3], const double P1[3],
+                      const double Q0[3], const double Q1[3],
+                      double &s, double &t) {
         const double EPS = 1e-12;
 
-        double d1[3] = { a1[0]-a0[0], a1[1]-a0[1], a1[2]-a0[2] };
-        double d2[3] = { b1[0]-b0[0], b1[1]-b0[1], b1[2]-b0[2] };
-        double r[3]  = { a0[0]-b0[0], a0[1]-b0[1], a0[2]-b0[2] };
+        double d1[3] = { P1[0]-P0[0], P1[1]-P0[1], P1[2]-P0[2] };
+        double d2[3] = { Q1[0]-Q0[0], Q1[1]-Q0[1], Q1[2]-Q0[2] };
+        double r[3]  = { P0[0]-Q0[0], P0[1]-Q0[1], P0[2]-Q0[2] };
 
-        double a = dot3(d1, d1);
-        double e = dot3(d2, d2);
-        double f = dot3(d2, r);
+        double a = dot3(d1,d1);
+        double e = dot3(d2,d2);
+        double f = dot3(d2,r);
 
-        // both segments degenerate into points
-        if (a <= EPS && e <= EPS) { u = 0.0; v = 0.0; return; }
+        // Both segments degenerate
+        if (a <= EPS && e <= EPS) { s = 0.0; t = 0.0; return; }
 
-        // first segment degenerates into a point
+        // First segment degenerates
         if (a <= EPS) {
-            u = 0.0;
-            v = (e > EPS) ? (f / e) : 0.0;
-            v = std::clamp(val, 0.0, 1.0);
+            s = 0.0;
+            t = (e > EPS) ? (f / e) : 0.0;
+            t = std::clamp(t, 0.0, 1.0);
             return;
         }
 
-        double c = dot3(d1, r);
+        double c = dot3(d1,r);
 
-        // second segment degenerates into a point
+        // Second segment degenerates
         if (e <= EPS) {
-            v = 0.0;
-            u = std::clamp(-c / a, 0.0, 1.0);
+            t = 0.0;
+            s = -c / a;
+            s = std::clamp(s, 0.0, 1.0);
             return;
         }
 
-        double b = dot3(d1, d2);
+        double b = dot3(d1,d2);
         double denom = a*e - b*b;
 
-        double uN, uD = denom;
-        double vN, vD = denom;
+        double sN, sD = denom;
+        double tN, tD = denom;
 
-        // parallel case
+        // Parallel case
         if (denom < EPS) {
-            uN = 0.0; uD = 1.0;
-            vN = f;   vD = e;
+            sN = 0.0; sD = 1.0;
+            tN = f;   tD = e;
         } else {
-            uN = (b*f - c*e);
-            vN = (a*f - b*c);
+            sN = (b*f - c*e);
+            tN = (a*f - b*c);
         }
 
-        // clamp u to [0,1]
-        if (uN < 0.0) {
-            uN = 0.0;
-            vN = f;
-            vD = e;
-        } else if (uN > uD) {
-            uN = uD;
-            vN = f + b;
-            vD = e;
+        // Clamp s to [0,1] via numerator logic
+        if (sN < 0.0) {
+            sN = 0.0;
+            tN = f;
+            tD = e;
+        } else if (sN > sD) {
+            sN = sD;
+            tN = f + b;
+            tD = e;
         }
 
-        // clamp v to [0,1], recompute u if needed
-        if (vN < 0.0) {
-            vN = 0.0;
-            uN = -c;
-            uD = a;
-            uN = std::clamp(uN, 0.0, uD);
-        } else if (vN > vD) {
-            vN = vD;
-            uN = b - c;
-            uD = a;
-            uN = std::clamp(uN, 0.0, uD);
+        // Clamp t to [0,1] and recompute s if needed
+        if (tN < 0.0) {
+            tN = 0.0;
+            sN = -c;
+            sD = a;
+            sN = std::clamp(sN, 0.0, sD);
+        } else if (tN > tD) {
+            tN = tD;
+            sN = b - c;
+            sD = a;
+            sN = std::clamp(sN, 0.0, sD);
         }
 
-        u = (std::abs(uD) > EPS) ? (uN / uD) : 0.0;
-        v = (std::abs(vD) > EPS) ? (vN / vD) : 0.0;
+        s = (std::abs(sD) > EPS) ? (sN / sD) : 0.0;
+        t = (std::abs(tD) > EPS) ? (tN / tD) : 0.0;
 
-        u = std::clamp(u, 0.0, 1.0);
-        v = std::clamp(v, 0.0, 1.0);
+        s = std::clamp(s, 0.0, 1.0);
+        t = std::clamp(t, 0.0, 1.0);
     };
+
 
     // Only run WCA if parameters are active
     if (eps != 0.0 && sigma > 0.0) {
@@ -203,21 +221,13 @@ void rod_energy_grad(
                 double u = 0.0, v = 0.0;
                 closest_uv(a0, a1, b0, b1, u, v);
 
-                // closest points p(u), q(v)
-                double p[3] = {
-                    (1.0-u)*a0[0] + u*a1[0],
-                    (1.0-u)*a0[1] + u*a1[1],
-                    (1.0-u)*a0[2] + u*a1[2]
-                };
-                double q[3] = {
-                    (1.0-v)*b0[0] + v*b1[0],
-                    (1.0-v)*b0[1] + v*b1[1],
-                    (1.0-v)*b0[2] + v*b1[2]
-                };
+                double p[3], q[3], rvec[3];
+                lerp3(p, a0, a1, u);
+                lerp3(q, b0, b1, v);
+                sub3(rvec, p, q);
 
-                double rvec[3] = { p[0]-q[0], p[1]-q[1], p[2]-q[2] };
-                double d2 = dot3(rvec, rvec);
-                double d  = std::sqrt(std::max(d2, 1e-24));
+                double d = norm3(rvec);
+
 
                 if (d >= rcut) continue;
 
