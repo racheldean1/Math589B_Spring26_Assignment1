@@ -125,17 +125,19 @@ def bfgs(
 
         ys = float(y @ s)
 
-        # Expanded-form inverse-Hessian BFGS update:
-        # H_{k+1} = H_k - (H_k y y^T H_k)/(y^T H_k y) + (s s^T)/(y^T s)
-        Hy = H @ y
-        yHy = float(y @ Hy)
+# Curvature check
+        if ys > 1e-12:
+            rho = 1.0 / ys
+            I = np.eye(n)
 
-        if ys > 1e-12 and yHy > 1e-12:
-            H = H - np.outer(Hy, Hy) / yHy + np.outer(s, s) / ys
-            # keep symmetry (numerical cleanup)
+    # Inverse-BFGS update
+            V = I - rho * np.outer(s, y)
+            H = V @ H @ V.T + rho * np.outer(s, s)
+
+    # Numerical cleanup
             H = 0.5 * (H + H.T)
         else:
-            # Reset H if needed
+    # If curvature condition fails, reset (or skip update)
             H = np.eye(n)
 
         x = x_new
