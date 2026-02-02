@@ -203,6 +203,7 @@ void rod_energy_grad(
 
             // WCA energy
             double invd = 1.0 / d;
+            if (d < 1e-8) d = 1e-8;
             double sr   = sigma * invd;
             double sr2  = sr * sr;
             double sr6  = sr2 * sr2 * sr2;
