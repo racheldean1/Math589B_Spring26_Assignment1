@@ -6,7 +6,6 @@ extern "C" {
 // Bump when you change the exported function signatures.
 int rod_api_version() { return 2; }
 
-// Exported API (students may extend, but autograder only requires Python-level RodEnergy.value_and_grad).
 // x: length 3N (xyzxyz...)
 // grad_out: length 3N
 // Periodic indexing enforces a closed loop.
@@ -39,6 +38,16 @@ void rod_energy_grad(
         grad_out[3 * idx(i) + d] += v;
     };
 
+    auto dot3 = [](const double a[3], const double b[3]) -> double {
+        return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+    };
+
+    auto clamp01 = [](double t) -> double {
+        if (t < 0.0) return 0.0;
+        if (t > 1.0) return 1.0;
+        return t;
+    };
+
     // ---- Bending: kb * ||x_{i+1} - 2 x_i + x_{i-1}||^2
     for (int i = 0; i < N; ++i) {
         for (int d = 0; d < 3; ++d) {
@@ -54,23 +63,23 @@ void rod_energy_grad(
 
     // ---- Stretching: ks * (||x_{i+1}-x_i|| - l0)^2
     for (int i = 0; i < N; ++i) {
-        double dx0 = get(i + 1, 0) - get(i, 0);
-        double dx1 = get(i + 1, 1) - get(i, 1);
-        double dx2 = get(i + 1, 2) - get(i, 2);
+        double dx[3] = {
+            get(i + 1, 0) - get(i, 0),
+            get(i + 1, 1) - get(i, 1),
+            get(i + 1, 2) - get(i, 2)
+        };
 
-        double r = std::sqrt(dx0*dx0 + dx1*dx1 + dx2*dx2);
+        double r = std::sqrt(dot3(dx, dx));
         r = std::max(r, 1e-12);
 
         double diff = r - l0;
         E += ks * diff * diff;
 
         double coeff = 2.0 * ks * diff / r;
-        addg(i + 1, 0,  coeff * dx0);
-        addg(i + 1, 1,  coeff * dx1);
-        addg(i + 1, 2,  coeff * dx2);
-        addg(i,     0, -coeff * dx0);
-        addg(i,     1, -coeff * dx1);
-        addg(i,     2, -coeff * dx2);
+        for (int d = 0; d < 3; ++d) {
+            addg(i + 1, d,  coeff * dx[d]);
+            addg(i,     d, -coeff * dx[d]);
+        }
     }
 
     // ---- Confinement: kc * sum ||x_i||^2
@@ -82,51 +91,65 @@ void rod_energy_grad(
         }
     }
 
-    // ---- Segment-segment WCA self-avoidance (closest points; NO implicit du/dv differentiation)
+    // ---- Segment-segment WCA self-avoidance (closest features) ----
+    //
+    // We compute closest points p(u) on segment [a0,a1] and q(v) on [b0,b1],
+    // with u,v clamped to [0,1]. Then:
+    //   r = p - q, d = ||r||
+    // If d < rcut = 2^(1/6) sigma:
+    //   U(d) = 4 eps [ (sigma/d)^12 - (sigma/d)^6 ] + eps
+    // Gradient uses envelope-theorem style (treat u,v fixed after closest-feature selection):
+    //   dU/dr = (dU/dd) * r/d
+    // distribute to endpoints with barycentric weights.
+    //
+    const double rcut = std::pow(2.0, 1.0/6.0) * sigma;
 
-    auto clamp01 = [](double t) {
-        if (t < 0.0) return 0.0;
-        if (t > 1.0) return 1.0;
-        return t;
-    };
-
-    auto dot3 = [](const double a[3], const double b[3]) {
-        return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
-    };
-
-    const double rcut = std::pow(2.0, 1.0/6.0) * sigma; // WCA cutoff
-
-    // Robust closest points on two segments in 3D:
-    // Returns (u,v) in [0,1]^2 for p=a0+u(A), q=b0+v(B).
+    // Robust closest points for two segments in 3D (Ericson-style).
+    // Returns u,v in [0,1] for p=a0 + u*(a1-a0), q=b0 + v*(b1-b0).
     auto closest_uv = [&](const double a0[3], const double a1[3],
                           const double b0[3], const double b1[3],
                           double &u, double &v) {
         const double EPS = 1e-14;
 
-        double A[3] = { a1[0]-a0[0], a1[1]-a0[1], a1[2]-a0[2] };
-        double B[3] = { b1[0]-b0[0], b1[1]-b0[1], b1[2]-b0[2] };
-        double r[3] = { a0[0]-b0[0], a0[1]-b0[1], a0[2]-b0[2] };
+        double d1[3] = { a1[0]-a0[0], a1[1]-a0[1], a1[2]-a0[2] };
+        double d2[3] = { b1[0]-b0[0], b1[1]-b0[1], b1[2]-b0[2] };
+        double r[3]  = { a0[0]-b0[0], a0[1]-b0[1], a0[2]-b0[2] };
 
-        double a = dot3(A, A); // |A|^2
-        double e = dot3(B, B); // |B|^2
-        double b = dot3(A, B);
-        double c = dot3(A, r);
-        double f = dot3(B, r);
+        double a = dot3(d1, d1);
+        double e = dot3(d2, d2);
+        double f = dot3(d2, r);
 
-        // Degenerate segments
+        // If both segments degenerate into points
         if (a <= EPS && e <= EPS) { u = 0.0; v = 0.0; return; }
-        if (a <= EPS) { u = 0.0; v = clamp01(f / e); return; }
-        if (e <= EPS) { v = 0.0; u = clamp01(-c / a); return; }
 
+        // If first segment degenerates into a point
+        if (a <= EPS) {
+            u = 0.0;
+            v = clamp01(f / e);
+            return;
+        }
+
+        double c = dot3(d1, r);
+
+        // If second segment degenerates into a point
+        if (e <= EPS) {
+            v = 0.0;
+            u = clamp01(-c / a);
+            return;
+        }
+
+        double b = dot3(d1, d2);
         double denom = a*e - b*b;
 
+        // Compute u on infinite lines, then clamp to segment
         if (std::abs(denom) > EPS) {
             u = clamp01((b*f - c*e) / denom);
         } else {
-            // Parallel / near-parallel
+            // Nearly parallel
             u = 0.0;
         }
 
+        // Compute v from u, then clamp; recompute u if clamped v hits boundary
         v = (b*u + f) / e;
 
         if (v < 0.0) {
@@ -135,28 +158,21 @@ void rod_energy_grad(
         } else if (v > 1.0) {
             v = 1.0;
             u = clamp01((b - c) / a);
-        }
-
-        // Optional boundary refinement
-        if (u <= 0.0) {
-            u = 0.0;
-            v = clamp01(f / e);
-        } else if (u >= 1.0) {
-            u = 1.0;
-            double r1[3] = { a1[0]-b0[0], a1[1]-b0[1], a1[2]-b0[2] };
-            v = clamp01(dot3(B, r1) / e);
+        } else {
+            // v already interior
+            v = clamp01(v);
         }
     };
 
+    // Iterate segment pairs (i,i+1) and (j,j+1).
+    // Exclude adjacent segments including wrap neighbors.
     for (int i = 0; i < N; ++i) {
         int ip1 = i + 1;
-
         for (int j = i + 1; j < N; ++j) {
             int jp1 = j + 1;
 
-            // Exclusions: skip adjacent segments (including wrap neighbors)
             int di = (j - i + N) % N;
-            if (di <= 2 || di >= N - 2) continue;
+            if (di == 0 || di == 1 || di == N - 1) continue; // same/adjacent/wrap-adjacent
 
             double a0[3] = { get(i,0),   get(i,1),   get(i,2)   };
             double a1[3] = { get(ip1,0), get(ip1,1), get(ip1,2) };
@@ -197,20 +213,20 @@ void rod_energy_grad(
             // dU/dd
             double dU_dd = (24.0 * eps * invd) * (-2.0 * sr12 + sr6);
 
-            // unit direction n = r / d
-            double nvec[3] = { rvec[0]*invd, rvec[1]*invd, rvec[2]*invd };
+            // dU/dr = dU/dd * r/d
+            double gdir[3] = { dU_dd * rvec[0] * invd,
+                               dU_dd * rvec[1] * invd,
+                               dU_dd * rvec[2] * invd };
 
-            // Gradient contribution to endpoints (treat u,v as the closest-point weights)
+            // Distribute to endpoints with barycentric weights
             for (int dim = 0; dim < 3; ++dim) {
-                double gcomp = dU_dd * nvec[dim];
+                double gc = gdir[dim];
 
-                // p = (1-u)a0 + u a1
-                addg(i,   dim, (1.0 - u) * gcomp);
-                addg(i+1, dim, u * gcomp);
+                addg(i,   dim,  (1.0 - u) * gc);
+                addg(ip1, dim,  u * gc);
 
-                // q = (1-v)b0 + v b1, and r = p - q => negative contribution for b endpoints
-                addg(j,   dim, -(1.0 - v) * gcomp);
-                addg(j+1, dim, -v * gcomp);
+                addg(j,   dim, -(1.0 - v) * gc);
+                addg(jp1, dim, -v * gc);
             }
         }
     }
