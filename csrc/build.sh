@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 #  - macOS: librod.dylib
 
 CXX="${CXX:-g++}"
-CXXFLAGS="-03 -std=c++17 -fPIC"
+CXXFLAGS="-O3 -std=c++17 -fPIC"
 
 UNAME="$(uname -s)"
 if [[ "$UNAME" == "Darwin" ]]; then
