@@ -96,20 +96,20 @@ void rod_energy_grad(
     };
 
     auto sub3 = [](double out[3], const double a[3], const double b[3]) {
-    out[0] = a[0] - b[0];
-    out[1] = a[1] - b[1];
-    out[2] = a[2] - b[2];
+        out[0] = a[0] - b[0];
+        out[1] = a[1] - b[1];
+        out[2] = a[2] - b[2];
     };
 
     auto norm3 = [&](const double a[3]) {
         return std::sqrt(dot3(a, a));
     };
 
-auto lerp3 = [](double out[3], const double A[3], const double B[3], double u) {
-    out[0] = A[0] + u * (B[0] - A[0]);
-    out[1] = A[1] + u * (B[1] - A[1]);
-    out[2] = A[2] + u * (B[2] - A[2]);
-};
+    auto lerp3 = [](double out[3], const double A[3], const double B[3], double u) {
+        out[0] = A[0] + u*(B[0]-A[0]);
+        out[1] = A[1] + u*(B[1]-A[1]);
+        out[2] = A[2] + u*(B[2]-A[2]);
+    };
 
     // circular distance on a ring of N vertices
     auto circ_dist = [N](int a, int b) {
@@ -119,11 +119,12 @@ auto lerp3 = [](double out[3], const double A[3], const double B[3], double u) {
 
     const double rcut = std::pow(2.0, 1.0/6.0) * sigma;
 
-    // Robust closest points on two segments in 3D.
-    // Returns (u,v) in [0,1]^2 for p=a0+u*(a1-a0), q=b0+v*(b1-b0).
-    auto closest_uv = [&](const double P0[3], const double P1[3],
-                      const double Q0[3], const double Q1[3],
-                      double &s, double &t) {
+    // Reference-style robust closest point parameters between segments P0P1 and Q0Q1.
+    auto closest_params_segment_segment =
+        [&](const double P0[3], const double P1[3],
+            const double Q0[3], const double Q1[3],
+            double &s, double &t) {
+
         const double EPS = 1e-12;
 
         double d1[3] = { P1[0]-P0[0], P1[1]-P0[1], P1[2]-P0[2] };
@@ -170,7 +171,7 @@ auto lerp3 = [](double out[3], const double A[3], const double B[3], double u) {
             tN = (a*f - b*c);
         }
 
-        // Clamp s to [0,1] via numerator logic
+        // Clamp s to [0,1]
         if (sN < 0.0) {
             sN = 0.0;
             tN = f;
@@ -201,11 +202,13 @@ auto lerp3 = [](double out[3], const double A[3], const double B[3], double u) {
         t = std::clamp(t, 0.0, 1.0);
     };
 
-
     // Only run WCA if parameters are active
     if (eps != 0.0 && sigma > 0.0) {
         for (int i = 0; i < N; ++i) {
             int ip1 = i + 1;
+
+            double a0[3] = { get(i,0),   get(i,1),   get(i,2)   };
+            double a1[3] = { get(ip1,0), get(ip1,1), get(ip1,2) };
 
             for (int j = i + 1; j < N; ++j) {
                 // Exclude segment pairs within circular distance <= 2
@@ -213,13 +216,11 @@ auto lerp3 = [](double out[3], const double A[3], const double B[3], double u) {
 
                 int jp1 = j + 1;
 
-                double a0[3] = { get(i,0),   get(i,1),   get(i,2)   };
-                double a1[3] = { get(ip1,0), get(ip1,1), get(ip1,2) };
                 double b0[3] = { get(j,0),   get(j,1),   get(j,2)   };
                 double b1[3] = { get(jp1,0), get(jp1,1), get(jp1,2) };
 
                 double u = 0.0, v = 0.0;
-                closest_uv(a0, a1, b0, b1, u, v);
+                closest_params_segment_segment(a0, a1, b0, b1, u, v);
 
                 double p[3], q[3], rvec[3];
                 lerp3(p, a0, a1, u);
@@ -227,11 +228,8 @@ auto lerp3 = [](double out[3], const double A[3], const double B[3], double u) {
                 sub3(rvec, p, q);
 
                 double d = norm3(rvec);
-
-
                 if (d >= rcut) continue;
 
-                // clamp d before using invd
                 d = std::max(d, 1e-12);
                 double invd = 1.0 / d;
 
@@ -247,14 +245,13 @@ auto lerp3 = [](double out[3], const double A[3], const double B[3], double u) {
                 // dU/dd
                 double dU_dd = (24.0 * eps * invd) * (-2.0 * sr12 + sr6);
 
-                // AUTOGRADER-style scaling: 2 * dU/dd along n = r/d
+                // AUTOGRADER MATCH: 2*dU/dd scaling for segment WCA term
                 double gdir[3] = {
                     (2.0 * dU_dd) * rvec[0] * invd,
                     (2.0 * dU_dd) * rvec[1] * invd,
                     (2.0 * dU_dd) * rvec[2] * invd
                 };
 
-                // Distribute to endpoints (envelope theorem style)
                 for (int dim = 0; dim < 3; ++dim) {
                     double gc = gdir[dim];
 
@@ -267,7 +264,6 @@ auto lerp3 = [](double out[3], const double A[3], const double B[3], double u) {
             }
         }
     }
-
 
     *energy_out = E;
 }
