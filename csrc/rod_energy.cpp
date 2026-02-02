@@ -123,7 +123,6 @@ void rod_energy_grad(
             double a1[3] = { get(ip1,0), get(ip1,1), get(ip1,2) };
 
             double b0[3] = { get(j,0),   get(j,1),   get(j,2) };
-            // *** CRITICAL: must be jp1, not ip1 ***
             double b1[3] = { get(jp1,0), get(jp1,1), get(jp1,2) };
 
             double A[3]  = { a1[0]-a0[0], a1[1]-a0[1], a1[2]-a0[2] }; // direction vectors
