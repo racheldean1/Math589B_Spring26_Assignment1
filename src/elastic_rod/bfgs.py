@@ -33,8 +33,8 @@ def backtracking_line_search(
     """
     # TODO (students): implement Armijo condition and backtracking.
     # Armijo: f(x + a p) <= f(x) + c1 a g^T p
-    alpha = float(alpha0)     // initial step size guess 
-    gTp = float(g @ p)        // directional derivative
+    alpha = float(alpha0)     # initial step size guess 
+    gTp = float(g @ p)        # directional derivative
 
     n_feval_inc = 0
 
@@ -46,7 +46,7 @@ def backtracking_line_search(
     # store the last values
     f_new, g_new = f, g
 
-    // start to decrease alpha 
+    # start to decrease alpha 
     for _ in range(max_steps):
         x_new = x + alpha * p        # canditate for the new point 
         f_new, g_new = f_and_g(x_new)        # evaluate
